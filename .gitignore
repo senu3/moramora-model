@@ -1,0 +1,4 @@
+/node_modules/
+/dist/
+/references/
+*.blend[0-9]

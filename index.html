@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>マンボウ 軽量版の確認</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#30363c;color:#ecf0f2;font:14px/1.6 system-ui,sans-serif}canvas{display:block}aside{position:fixed;top:16px;left:16px;width:260px;max-height:calc(100vh - 32px);overflow:auto;padding:18px;background:#1d252ce8;border:1px solid #64717b;border-radius:10px}h1{font-size:16px;margin:0 0 8px}p{font-size:12px;color:#c3ced6;margin:6px 0 14px}label{display:block;margin:8px 0}input[type=range],select{width:100%;accent-color:#83ccbd}button,select{background:#35434e;color:#fff;border:1px solid #73818b;border-radius:4px;padding:5px 8px;font:inherit}button{cursor:pointer;margin:2px}output{float:right;font-variant-numeric:tabular-nums}#status{white-space:pre-line;font-size:12px}details{margin-top:14px}summary{cursor:pointer}small{color:#b5c3cc}
+</style></head><body><aside><h1>マンボウ · ゲーム用軽量版</h1><div id="status">読み込み中…</div><p>ドラッグで回転、ホイールで拡大。制作原本とは別の書き出し用モデルです。</p>
+<p><a href="?" style="color:#83ccbd">通常版</a> · <a href="?model=compressed" style="color:#83ccbd">圧縮版</a> <span id="modelLabel"></span></p>
+<div id="views"><button data-view="side">横</button><button data-view="front">正面</button><button data-view="rear">背面</button><button data-view="oblique">斜め</button><button data-view="gill">鰓</button><button data-view="gillRear">鰓の開口</button><button data-view="eye">目</button></div>
+<label><input id="play" type="checkbox"> 巡航ループを再生</label><label>時間 <output id="timeLabel">0.00 s</output><input id="time" type="range" min="0" max="21" step="0.01" value="0"></label>
+<p>鰭は3秒、鰓は7秒周期。手動で口・鰓を調整すると再生を止めます。</p>
+<label>口の開き <output id="mouthLabel">0.00</output><input id="mouth" type="range" min="0" max="1" step="0.01" value="0"></label>
+<label>鰓の開き <output id="gillLabel">0.00</output><input id="gill" type="range" min="0" max="1" step="0.01" value="0"></label>
+<label>鰓の膨らみ <output id="bulgeLabel">0.00</output><input id="bulge" type="range" min="-1" max="1" step="0.01" value="0"></label>
+<details><summary>回転制限端の確認</summary><p>再生を止め、各部位を単独で動かします。</p><select id="pose"><option value="rest">中立</option></select></details>
+<p><small>glTFにはFK制約自体は入りません。巡航は制約評価後の動きをベイクしています。独自操作時はBlenderと同じ角度範囲を使用してください。</small></p></aside>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+const $=id=>document.getElementById(id),scene=new THREE.Scene();scene.background=new THREE.Color('#42474b');
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;document.body.prepend(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(35,innerWidth/innerHeight,.01,100),controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
+scene.add(new THREE.HemisphereLight(0xeaf2ff,0x8a8170,2));const key=new THREE.DirectionalLight(0xfff5e8,2.4);key.position.set(4,5,4);scene.add(key);const fill=new THREE.DirectionalLight(0xdce8ff,.7);fill.position.set(-4,1,-2);scene.add(fill);
+window.audit={ready:false};
+const sourceName=(g,o)=>{const a=g.parser.associations.get(o);return a?.nodes!==undefined?g.parser.json.nodes[a.nodes].name:o.name;};
+try{
+ const compressed=new URLSearchParams(location.search).get('model')==='compressed';
+ $('modelLabel').textContent=compressed?'（圧縮版を表示中）':'（通常版を表示中）';
+ const modelFile=compressed?'sunfish_game_compressed.glb':'sunfish_game.glb';
+ const g=await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(`./models/${modelFile}`);scene.add(g.scene);
+ const meshes={},bones={},rest=new Map();g.scene.traverse(o=>{if(o.isMesh)meshes[sourceName(g,o)]=o;if(o.isBone){bones[sourceName(g,o)]=o;rest.set(o,o.matrix.clone());}});
+ const mixer=new THREE.AnimationMixer(g.scene),clip=g.animations.find(a=>a.name==='Swim_Cruise_Loop')||g.animations[0],duration=clip?.duration||21;if(clip)mixer.clipAction(clip).play();$('time').max=duration;
+ function update(){g.scene.updateMatrixWorld(true);Object.values(meshes).forEach(o=>o.skeleton?.update());}
+ function reset(){mixer.stopAllAction();for(const [b,m] of rest)m.decompose(b.position,b.quaternion,b.scale);}
+ function keys(values,resetMissing=true){for(const m of Object.values(meshes))for(const [name,index] of Object.entries(m.morphTargetDictionary||{})){if(resetMissing||name in values)m.morphTargetInfluences[index]=values[name]??0;}update();}
+ const keyInputs={mouth:'Mouth_Open',gill:'Gill_Open',bulge:'Gill_Bulge'};
+ function morphValues(){const m=Object.values(meshes).find(m=>m.morphTargetDictionary?.Gill_Open!==undefined);return Object.fromEntries(Object.values(keyInputs).map(name=>[name,m?.morphTargetInfluences?.[m.morphTargetDictionary[name]]||0]));}
+ function syncKeys(){const values=morphValues();for(const [id,name]of Object.entries(keyInputs)){$(id).value=values[name];$(id+'Label').textContent=values[name].toFixed(2);}}
+ function time(t){t=THREE.MathUtils.clamp(t,0,duration);if(clip){mixer.clipAction(clip).play();mixer.setTime(t===duration?duration-1e-7:t);}update();syncKeys();$('time').value=t;$('timeLabel').textContent=t.toFixed(2)+' s';}
+ function view(name){const target=new THREE.Vector3(0,0,0);let pos;
+  if(name==='side')pos=[6,0,0];else if(name==='front')pos=[0,0,6];else if(name==='rear')pos=[0,0,-6];else if(name==='gill'){target.set(.47,.02,.6);pos=[1.65,.1,1.1];}else if(name==='gillRear'){target.set(.475,.038,.603);pos=[1.6,.16,.1];}else if(name==='eye'){target.set(.32,.16,1.03);pos=[1.15,.3,1.7];}else pos=[5,1.3,4.5];
+  camera.position.fromArray(pos);controls.target.copy(target);controls.update();renderer.render(scene,camera);
+ }
+ function setCase(c){$('play').checked=false;reset();if(c.frame!==undefined)time((c.frame-1)/30);else{if(c.bones)for(const [name,arr]of Object.entries(c.bones)){const b=bones[name];if(b)new THREE.Matrix4().fromArray(arr).decompose(b.position,b.quaternion,b.scale);}$('time').value=0;$('timeLabel').textContent='0.00 s';}if(c.keys!==undefined||c.frame===undefined)keys(c.keys||{});syncKeys();update();}
+ const tri=Object.values(meshes).reduce((s,o)=>s+o.geometry.index.count/3,0);
+ $('status').textContent=tri.toLocaleString()+' 三角形 · '+Object.keys(bones).length+' ボーン\n'+g.animations.map(c=>c.name+' · '+c.duration.toFixed(2)+'秒').join('\n');
+ window.audit={ready:true,meshes:Object.fromEntries(Object.entries(meshes).map(([n,m])=>[n,{vertices:m.geometry.attributes.position.count,triangles:m.geometry.index.count/3,keys:m.morphTargetDictionary||{}}])),clips:g.animations.map(c=>({name:c.name,duration:c.duration})),triangles:tri,
+  time,keys,view,setCase,morphValues,render:()=>renderer.render(scene,camera),
+  sample:(name,indices)=>{update();const m=meshes[name];return indices.map(i=>m.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(m.matrixWorld).toArray());},
+  matrices:()=>Object.fromEntries(Object.entries(bones).map(([n,b])=>{b.updateMatrix();return[n,b.matrix.toArray()];})),
+  bonePose:(name,angles)=>{reset();const b=bones[name],q=new THREE.Quaternion().setFromEuler(new THREE.Euler(...angles,'XYZ'));b.quaternion.multiply(q);update();},
+  info:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries}),
+ };
+ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));$('time').oninput=()=>{$('play').checked=false;time(+$('time').value);};
+ for(const id of Object.keys(keyInputs))$(id).oninput=()=>{$('play').checked=false;for(const x of Object.keys(keyInputs))$(x+'Label').textContent=(+$(x).value).toFixed(2);keys(Object.fromEntries(Object.entries(keyInputs).map(([x,k])=>[k,+$(x).value])),false);};
+ const limitsResponse=await fetch('./models/limit-poses.json');
+ if(!limitsResponse.ok)throw new Error(`制限姿勢を読み込めませんでした（HTTP ${limitsResponse.status}）`);
+ const limits=await limitsResponse.json();
+ for(const c of limits.cases.filter(c=>c.fk)){$('pose').add(new Option(c.name,c.name));}
+ $('pose').onchange=()=>setCase(limits.cases.find(c=>c.name===$('pose').value));
+ time(0);view('oblique');
+ let prev=performance.now();function frame(now){requestAnimationFrame(frame);if($('play').checked)time((+$('time').value+Math.min((now-prev)/1000,.1))%duration);prev=now;controls.update();renderer.render(scene,camera);}requestAnimationFrame(frame);
+}catch(e){window.audit={error:String(e)};$('status').textContent=String(e);console.error(e);}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script></body></html>
