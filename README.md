@@ -18,8 +18,8 @@ npm run dev
 [軽量版のBlenderファイル](blender/sunfish_game.blend)を Blender 5.2 で開きます。材質用のテクスチャはファイルに内包しています。
 
 1. 胴体の Shape Keys で `Mouth_Open`、`Gill_Open`、`Gill_Bulge` を動かし、開口と膜の膨らみを見比べます。
-2. リグをポーズモードで開き、胸鰭の付け根のローカルX軸と、片側4本の主ボーンおよび後縁の補助ボーンを確認します。
-3. アクションエディターで `Swim_Cruise_FourBonePectoral` を確認します。ブラウザーでは、制約を評価してベイクした `Swim_Cruise_Loop` を再生します。
+2. リグをポーズモードで開き、左右の胸鰭をそれぞれ2本のボーンで動かします。付け根のボーンをローカルX軸で回し、鰭の折りたたみ方を確認します。
+3. アクションエディターで `Swim_Cruise_Loop` を確認します。ブラウザーでは、制約を評価してベイクした21秒の巡航クリップを再生します。
 
 工程ごとの指示と結果は[制作ログ](docs/SUNFISH_MODEL_CREATION_LOG.md)にまとめています。
 
