@@ -6,6 +6,9 @@ https://github.com/user-attachments/assets/6d0c8306-9bf2-42ac-b4dc-75eb9269f08b
 
 **[マンボウの3Dモデルデモ](https://senu3.github.io/moramora-model/)**
 
+**[マンボウの3Dモデル](https://github.com/senu3/moramora-model/blob/main/blender/sunfish_game.blend**
+
+このリポジトリ内にあるモデルはCC0で配布します。
 
 ## 制作に使ったプロンプト
 
